@@ -1,0 +1,752 @@
+# ElajX (علاجك) — Phase 4H.1
+# AUTHORITATIVE MIGRATION DESIGN BLUEPRINT
+## Principal-Level PostgreSQL Architecture, Supabase Security, Transactional Integrity & Implementation Readiness
+
+---
+
+## 0. MISSION AND OPERATING MODE
+
+Act as a principal-level engineering review team consisting of:
+
+1. PostgreSQL Database Architect
+2. Supabase Security and RLS Specialist
+3. Transaction Processing and Concurrency Engineer
+4. Pharmacy Inventory and Order-Lifecycle Domain Architect
+5. Application Security Engineer
+6. Database Migration and Rollback Specialist
+7. QA and Adversarial Test Engineer
+
+Your mission is to produce a complete, evidence-based, implementation-ready **Migration Design Blueprint** for the existing ElajX Google AI Studio workspace.
+
+This is a DESIGN-ONLY phase.
+
+You are not authorized to implement the design, create migration files, edit existing source files, execute SQL, connect to Supabase, or modify any remote or local database.
+
+The final deliverable must be precise enough that a separate future authorization can use it as the specification for authoring migrations without reopening fundamental architectural questions.
+
+Do not confuse a detailed design with a verified implementation.
+
+Do not optimize for producing the longest report. Optimize for correctness, consistency, explicit assumptions, traceability, and the elimination of contradictory requirements.
+
+---
+
+## 1. NON-NEGOTIABLE SAFETY CONTRACT
+
+Throughout this phase:
+
+- Files created: exactly 0.
+- Files modified: exactly 0.
+- Files deleted: exactly 0.
+- Existing files formatted or rewritten: exactly 0.
+- SQL, DDL, or DML statements executed: exactly 0.
+- SQL migration files generated or written to disk: exactly 0.
+- Database connections: exactly 0.
+- Network calls: exactly 0.
+- Supabase CLI operations that access or mutate a project: prohibited.
+- Environment variables, secrets, access tokens, and database credentials: do not inspect, print, or request.
+- No live-schema, live-RLS, live-Storage, or live-PostgREST claims unless previously supplied authoritative evidence explicitly supports them.
+- Do not create sample secrets or realistic-looking credentials.
+- Do not place a service-role key in frontend code, browser configuration, Vite environment variables, or any `VITE_*` variable.
+- Do not change the existing baseline migration.
+- Do not silently approve any unresolved product, legal, financial, or operational policy.
+
+If an inspection command or action might modify files, access a network, or change a database, do not run it.
+
+You may inspect existing local source files read-only and reason from their contents.
+
+At the beginning of the report, explicitly confirm the safety contract and list the local files actually inspected.
+
+If a source file cannot be accessed, report it as NOT INSPECTED. Never invent file contents, paths, symbols, or line numbers.
+
+---
+
+## 2. PROJECT IDENTITY AND SOURCE OF TRUTH
+
+This task concerns only the ElajX workspace currently open in Google AI Studio.
+
+Do not merge or confuse it with other ElajX projects, including separate Lovable, Replit, Android, or legacy website workspaces.
+
+The previously reported local baseline is:
+
+`supabase/migrations/20261019000001_initial_schema.sql`
+
+Earlier reports describe the workspace as React 19, Vite 8, TypeScript, Tailwind CSS v4, and React Router v7, with several portals currently relying on development fixtures.
+
+These details are historical evidence to verify against the current local workspace, not unquestionable assumptions.
+
+Begin by inspecting the current project structure and the actual source files relevant to the database architecture.
+
+Prioritize:
+
+- The baseline migration.
+- Existing TypeScript types and state-machine logic.
+- Existing Supabase client and service code.
+- Existing customer, pharmacy, courier, and admin workflows.
+- Existing authorization and validation logic.
+- Existing integrity tests.
+- Existing documentation that records approved decisions.
+
+Do not perform an unrestricted repository rewrite or broad cleanup.
+
+### Evidence classifications
+
+Every substantive finding must be identified as one of:
+
+- `SOURCE FACT`: directly established from inspected local source.
+- `APPROVED PRODUCT DECISION`: explicitly approved by the user and supported by the supplied project context.
+- `DESIGN PROPOSAL`: a recommendation not yet implemented.
+- `REASONED RISK`: a technical risk derived from identified facts.
+- `NOT VERIFIED`: requires additional inspection, execution, or external evidence.
+- `UNRESOLVED POLICY`: requires an explicit product, legal, financial, or operational decision.
+
+Distinguish historical report statements from independently inspected source facts.
+
+---
+
+## 3. AUTHORITATIVE PRODUCT CONSTRAINTS
+
+Preserve the following decisions and constraints.
+
+### 3.1 Delivery OTP
+
+The user approved Option A: remove recipient delivery OTP from the delivery-completion workflow.
+
+The future design must support an authorized assigned courier reporting completion without asking the recipient for a delivery OTP.
+
+Keep account authentication and login OTP separate and intact.
+
+Identify all known delivery-OTP dependencies in the baseline, TypeScript helpers, customer UI, courier UI, and integrity tests.
+
+Design their removal or replacement as a future migration and application-code change. Do not perform those changes now.
+
+Do not claim the removal has already occurred.
+
+### 3.2 Order and request states
+
+Use the exact canonical enum values verified in the local baseline.
+
+Previously reported order states:
+
+- `confirmed`
+- `in_preparation`
+- `ready_for_pickup`
+- `assigned_to_courier`
+- `in_transit`
+- `delivered`
+- `failed_delivery`
+- `cancelled`
+
+Previously reported request states:
+
+- `submitted`
+- `under_pharmacy_review`
+- `alternative_proposed`
+- `availability_confirmed`
+- `converted_to_order`
+- `rejected`
+- `cancelled`
+
+Verify these values directly.
+
+Do not introduce new values into existing enums merely to represent return inspection, quarantine, or courier handover.
+
+Where necessary, design a separate operational lifecycle, typed event, or dedicated table.
+
+Do not use free-text event notes as the sole authoritative state of a business-critical workflow.
+
+### 3.3 Order and return policy
+
+- V1 supports whole-order returns only.
+- Partial item returns are outside the current V1 scope.
+- A failed delivery does not automatically mean the stock can be sold again.
+- A failed-delivery order remains unresolved until the package is physically returned and inspected according to the designed workflow.
+- An intact, verified return may restore eligible units to sellable inventory.
+- A broken seal, damaged package, or other disqualifying condition must prevent the affected units from returning to sellable stock.
+- The financial responsibility for damaged returns is unresolved. Do not assign it to the customer, courier, or pharmacy without explicit approval.
+
+### 3.4 Inventory requirements
+
+The design must support:
+
+- Inventory tracked by pharmacy and identifiable stock lot.
+- Integer pack quantities, unless actual source evidence establishes a justified alternative.
+- Reservations during the applicable active-order lifecycle.
+- Orders whose quantities are allocated across multiple lots.
+- No negative sellable stock.
+- No reservation exceeding the corresponding eligible stock balance.
+- Atomic reservation, release, settlement, and return processing.
+- Duplicate-request and concurrent-operation protection.
+- Lot-level expiry and traceability where supported by verified requirements.
+- A quarantine ledger or equivalent auditable non-sellable inventory record.
+- Reliable reconciliation between stock balances and allocation records.
+
+### 3.5 Dispatch
+
+The future design must support broadcasting a request to multiple eligible pharmacies within a dispatch round.
+
+Previously proposed uniqueness constraint:
+
+`UNIQUE (request_id, round_number, pharmacy_id)`
+
+Treat it as a candidate design requirement and verify the actual intended semantics.
+
+A pharmacy winning a dispatch offer must not be determined solely by a weak status check or an assumed uniqueness constraint.
+
+Specify one authoritative assignment mechanism and a concurrency-safe claim operation.
+
+Do not expose full patient address or phone information to pharmacies that have not been assigned the order.
+
+### 3.6 Unresolved policy decisions
+
+Keep each of the following unresolved:
+
+1. When delivery fees become final: request submission or order conversion.
+2. Maximum simultaneous active deliveries per courier.
+3. Dispatch-offer expiration window.
+4. Legally required prescription-file retention period.
+5. Financial liability for damaged, unsealed, or otherwise disqualified returns.
+
+Do not choose defaults and present them as approved policy.
+
+Where a design needs one of these values, use a documented configuration or explicit placeholder and explain the decision required before implementation.
+
+---
+
+## 4. PHASE 4G.7 DEFECTS THAT MUST BE ADDRESSED
+
+Previous reports proposed a coherent direction but did not fully establish the following.
+
+### 4.1 Inventory semantics are still ambiguous
+
+Do not proceed with the schema until you define the exact meaning of each inventory quantity.
+
+Explicitly distinguish, at minimum:
+
+- Physical units held at the pharmacy.
+- Units reserved for active orders but not yet handed to a courier.
+- Units physically in courier custody.
+- Units returned and awaiting inspection.
+- Units in quarantine.
+- Units eligible for sale.
+
+Determine whether these are separate balances, derived balances, or a combination of immutable movement records and derived state.
+
+Do not label a quantity `quantity_on_hand` as shelf stock while allowing it to include units physically held by a courier.
+
+Do not count the same physical unit in both sellable stock and quarantine.
+
+Do not assume a single balance formula can correctly represent every custody stage.
+
+### 4.2 Inventory conservation must be explicit
+
+Provide complete equations and define the scope of every term.
+
+At minimum, explain the relationship between:
+
+- Sellable physical stock.
+- Reserved quantity.
+- Available quantity.
+- Courier-held quantity.
+- Returned-uninspected quantity.
+- Quarantined quantity.
+- Permanently delivered or otherwise disposed-of quantity.
+
+Clearly distinguish a stock reservation from a physical transfer of custody.
+
+If the chosen model uses a movement ledger, specify which records are authoritative and how current balances are reconciled.
+
+If the chosen model uses mutable balance columns, specify how every mutation remains transactionally consistent with allocation and movement records.
+
+Choose one authoritative model. Do not propose two conflicting sources of truth without explaining their relationship.
+
+### 4.3 Settlement atomicity must cover every mutation
+
+A primary key on `order_settlements.order_id` does not, by itself, prove the whole workflow is safe.
+
+Define the atomic boundary for:
+
+- Order status changes.
+- Allocation state changes.
+- Inventory balance changes.
+- Settlement insertion.
+- Return inspection results.
+- Quarantine movements.
+- Audit events.
+
+Explain how an error at each step rolls back every dependent mutation.
+
+Identify unsafe exception-handling patterns, especially catching and suppressing a unique-constraint violation after earlier mutations.
+
+Specify how cancellation, courier completion, and return processing serialize against the same order.
+
+### 4.4 Idempotency must be implementable
+
+Define a complete idempotency contract for operations that clients may retry.
+
+Consider:
+
+- Actor identity derived server-side.
+- Operation name.
+- Idempotency key.
+- Canonical payload hashing.
+- Identical concurrent first use.
+- Reuse with a different payload.
+- Timeout after a successful commit.
+- Retry after rollback.
+- Retry after authorization or validation failure.
+- Cached response semantics.
+- Key retention and expiry.
+- Concurrent attempts against the same order.
+- The relationship between idempotency records and business transactions.
+
+Explain PostgreSQL uniqueness-conflict behavior and the required transaction/read sequence.
+
+Do not claim a durable `in_progress` state is observable by other transactions if the proposed transaction model does not actually permit that.
+
+Do not invent HTTP or PostgREST error semantics without explaining the relevant implementation boundary.
+
+### 4.5 Sole-admin protection must cover all mutation paths
+
+Design protection against removal or demotion of the last platform administrator.
+
+Analyze:
+
+- Single-row deletion.
+- Role demotion.
+- Multi-row `UPDATE`.
+- Multi-row `DELETE`.
+- Concurrent administrator demotions.
+- Self-demotion.
+- Privileged administrative procedures.
+- Bootstrap of the first administrator.
+
+If using an advisory transaction lock, specify the exact serialization contract and which trigger/function paths must use it.
+
+Explain how the final administrator count is checked against the effective statement outcome, including multi-row mutations.
+
+Do not rely on an unqualified row-level trigger count check.
+
+Do not claim that a proposed trigger exists in the current baseline unless verified.
+
+### 4.6 Security-definer RPCs must follow least privilege
+
+For every proposed `SECURITY DEFINER` function, specify:
+
+- Intended caller.
+- Authentication and authorization requirements.
+- Function owner assumptions.
+- Explicit `EXECUTE` grants and revocations.
+- Search-path policy.
+- Schema-qualified references where required.
+- Whether the function can bypass RLS and why.
+- Permitted input and output fields.
+- Ownership checks.
+- Relevant concurrency controls.
+- Audit requirements.
+
+Treat `SET search_path = public, pg_temp` as requiring security review, not as automatically safe.
+
+Avoid dynamic SQL unless essential and safely parameterized.
+
+Do not expose administrative or privileged functions to `anon` or `authenticated` indiscriminately.
+
+### 4.7 Candidate dispatch privacy must be enforceable
+
+Design a minimal discovery interface for eligible candidate pharmacies.
+
+The proposed response may include:
+
+- Request identifier.
+- Dispatch round.
+- Offer expiry timestamp.
+- Requested medicine names and quantities.
+- Necessary dosage and strength details when applicable.
+- Governorate and district only.
+
+Exclude:
+
+- Street, building, floor, apartment, and landmark.
+- Customer phone.
+- Unnecessary profile data.
+- Full address snapshots.
+- Prescription-file download URLs or tokens.
+
+Explain why a view or RPC alone does not provide protection if base-table privileges or RLS still permit a bypass.
+
+Define the authorization boundary for candidate discovery, offer claiming, and post-assignment access.
+
+Do not claim remote RLS or Storage behavior has been verified.
+
+---
+
+## 5. REQUIRED DESIGN WORKSTREAMS
+
+Produce a unified blueprint with the following workstreams.
+
+### Workstream A — Baseline Inventory and Migration Dependency Map
+
+1. Verify the actual baseline migration and its dependencies.
+2. Identify existing tables, enums, functions, triggers, policies, indexes, and grants relevant to the workflows.
+3. Identify missing schema components.
+4. Distinguish confirmed source facts from historical report claims.
+5. Propose a dependency-ordered migration sequence.
+6. Identify which changes are additive, which alter existing behavior, and which remove legacy functionality.
+7. Explain dependencies on application-code deployment.
+8. Do not generate actual migration files or executable SQL scripts.
+
+### Workstream B — Canonical Schema Blueprint
+
+For every proposed table, specify:
+
+- Purpose.
+- Primary key.
+- Foreign keys.
+- Unique constraints.
+- Check constraints.
+- Nullability.
+- Important indexes.
+- Tenant or ownership boundary.
+- Authoritative source-of-truth responsibility.
+- Mutations permitted and prohibited.
+- Retention or deletion implications.
+- Relationships to existing schema.
+- RLS policy intent.
+- Whether access should occur through a narrow RPC rather than direct table access.
+
+Include only tables that have a justified purpose.
+
+Evaluate, without assuming they must all be separate:
+
+- Pharmacy inventory lots.
+- Per-order/per-item/per-lot allocations.
+- Settlement ledger.
+- Inventory movement ledger.
+- Quarantine ledger.
+- Dispatch attempts or offers.
+- Delivery and return handover events.
+- Idempotency records.
+- Delivery zones and fee configuration.
+- Prescription-file metadata and ownership.
+- Any required operational state supporting returns.
+
+For every proposed table, state whether it is required for V1, optional for later, or conditional on an unresolved policy.
+
+Avoid duplicating authoritative state across multiple tables without defining synchronization and reconciliation rules.
+
+### Workstream C — Order Lifecycle and Transition Matrix
+
+Create a transition matrix covering:
+
+- Request submission.
+- Pharmacy review.
+- Alternative proposal and acceptance.
+- Availability confirmation.
+- Order creation.
+- Inventory reservation.
+- Preparation.
+- Seal registration.
+- Courier assignment.
+- Physical pickup and custody transfer.
+- In-transit delivery.
+- Successful delivery.
+- Failed delivery.
+- Return handover.
+- Pharmacy receipt.
+- Return inspection.
+- Intact-return disposition.
+- Damaged-return quarantine.
+- Cancellation.
+- Settlement and audit recording.
+
+For each transition, identify:
+
+- Source state.
+- Target state.
+- Authorized actor.
+- Required preconditions.
+- Authoritative RPC.
+- Required locks.
+- Inventory effect.
+- Settlement effect.
+- Idempotency behavior.
+- Audit event.
+- Expected failure behavior.
+
+Use existing canonical order/request statuses where appropriate. Model return operations separately where necessary.
+
+Do not allow a generic client status update to bypass the transition contract.
+
+### Workstream D — Inventory and Physical Custody Model
+
+Choose a single coherent inventory model and explain why it is superior to alternatives for this project.
+
+Define all quantities and units mathematically.
+
+Provide complete worked examples for:
+
+1. Single-lot reservation.
+2. Multi-lot reservation.
+3. Successful delivery.
+4. Cancellation before courier pickup.
+5. Failure during transit.
+6. Intact whole-order return.
+7. Broken-seal whole-order return.
+8. Concurrent manual stock adjustment.
+9. Duplicate delivery-completion retry.
+10. Partial allocation failure.
+11. Concurrent reservations competing for the same stock.
+12. Return inspection retry.
+13. A transaction that fails after one of several lot mutations.
+
+Every example must reconcile before-and-after balances and physical custody.
+
+Explicitly state which quantities change and which do not.
+
+Do not present a conservation proof if the equations or quantities are missing.
+
+### Workstream E — RPC and Transaction Contracts
+
+Provide design contracts—not executable SQL—for every critical operation, including as applicable:
+
+- Submit medicine request.
+- Start pharmacy review.
+- Confirm availability.
+- Respond to alternative.
+- Convert accepted request into an order.
+- Reserve inventory across multiple lots.
+- Claim dispatch offer.
+- Assign courier.
+- Verify tamper-evident seal at handover.
+- Record delivery completion without recipient OTP.
+- Record delivery failure.
+- Record return handover.
+- Record pharmacy receipt.
+- Inspect and process whole-order return.
+- Cancel an eligible order.
+- Reconcile inventory.
+- Bootstrap the first administrator.
+
+For each operation, provide:
+
+1. Caller and authorization.
+2. Input contract.
+3. Server-derived identity and trusted values.
+4. Preconditions.
+5. Locks acquired in a globally consistent order.
+6. Writes and their order.
+7. Transaction boundary.
+8. Idempotency contract.
+9. Audit behavior.
+10. Failure and retry behavior.
+11. Sensitive information returned.
+12. Relevant test cases.
+
+Do not state that all deadlocks are impossible. Explain remaining deadlock scenarios and how the implementation must detect, avoid, or safely retry them.
+
+### Workstream F — RLS, Grants, Storage and Privacy Matrix
+
+Create an access matrix across:
+
+- Anonymous user.
+- Authenticated customer.
+- Pharmacy staff.
+- Courier.
+- Platform administrator.
+- Server-side trusted process.
+
+Cover all relevant existing and proposed tables.
+
+For each role, state:
+
+- Direct `SELECT` access.
+- Direct `INSERT` access.
+- Direct `UPDATE` access.
+- Direct `DELETE` access.
+- RPC-mediated access.
+- Ownership or tenant restrictions.
+- Whether full customer PII is available.
+- Whether prescription metadata or files are available.
+
+Explicitly separate direct table privileges from RLS policy conditions.
+
+For prescription storage, specify:
+
+- Private bucket intent.
+- Object path and ownership binding.
+- Access checks.
+- Short-lived signed URL policy where appropriate.
+- Cross-customer and cross-pharmacy isolation.
+- Protection against guessing object paths.
+- Upload, read, replacement, and deletion authorization.
+- Retention policy dependency on unresolved legal review.
+
+Do not implement Storage policies or assume that a bucket exists.
+
+### Workstream G — Sole-Admin Safety and Bootstrap
+
+Provide a design that handles:
+
+- First administrator creation.
+- Subsequent role administration.
+- Last-admin removal prevention.
+- Concurrent role changes.
+- Audit records.
+- Recovery if the first-admin bootstrap fails.
+
+Explain the required operator trust boundary.
+
+Do not include credentials, keys, or a working privileged script.
+
+Do not propose a public self-elevation RPC.
+
+### Workstream H — Migration Plan and Compatibility
+
+Provide a dependency-ordered migration roadmap.
+
+For each proposed migration, list:
+
+- Scope and purpose.
+- Preconditions.
+- Objects added.
+- Existing objects altered.
+- Legacy objects retired.
+- Data migration or backfill requirements.
+- Locking or downtime considerations.
+- Application compatibility requirements.
+- Verification checks.
+- Rollback limitations.
+- Dependencies on unresolved decisions.
+
+Consider whether expand-and-contract deployment is needed to prevent frontend/database version incompatibility.
+
+Do not rewrite or execute the existing baseline.
+
+Do not claim a migration is reversible if dropping data, enum values, or privileged objects makes rollback unsafe.
+
+### Workstream I — Adversarial Test Design
+
+Create a future test matrix covering at minimum:
+
+- Concurrent order conversion.
+- Concurrent reservations on the same lot.
+- Multi-lot lock ordering.
+- Concurrent cancellation versus delivery completion.
+- Duplicate settlement.
+- Duplicate idempotency key with matching payload.
+- Duplicate idempotency key with conflicting payload.
+- Client timeout after commit.
+- Transaction rollback after partial work.
+- Failed delivery and return processing.
+- Broken-seal quarantine.
+- Duplicate return-inspection RPC.
+- Dispatch broadcast to multiple pharmacies.
+- Two pharmacies claiming the same offer.
+- Candidate address privacy.
+- Prescription Storage isolation.
+- Unauthorized courier completion.
+- Seal mismatch at pickup.
+- Last-admin deletion.
+- Concurrent admin demotions.
+- Bootstrap of the first administrator.
+- RLS and direct table grants.
+- Reconciliation between stock, allocations, movements, and settlements.
+
+For every test, specify the setup, concurrent actors where relevant, operation sequence, expected committed state, expected rejected operation, and invariant checked.
+
+Mark all tests `NOT EXECUTED`.
+
+---
+
+## 6. CRITICAL CONSISTENCY CHECKS
+
+Before issuing the final verdict, independently cross-check the blueprint for contradictions.
+
+At minimum verify:
+
+1. Every state referenced by an RPC is declared or explicitly identified as a proposed separate state.
+2. Every foreign-key target exists in the proposed dependency sequence.
+3. Every RLS policy references actual columns and compatible relationships.
+4. Every RPC has a defined authorization boundary.
+5. Every stock mutation has a matching allocation or movement effect.
+6. No physical unit can be counted as both sellable and quarantined.
+7. Reserved quantities cannot exceed eligible stock.
+8. Courier custody is not confused with pharmacy shelf stock.
+9. Settlement cannot commit without all required inventory and order mutations.
+10. Cancellation cannot release stock after successful delivery settlement.
+11. Return inspection cannot restore sellable stock twice.
+12. An idempotency record cannot become permanently inconsistent with the business transaction.
+13. Dispatch offers cannot produce multiple authoritative winning pharmacies for one request.
+14. Candidate discovery cannot expose full address or phone information.
+15. SECURITY DEFINER functions do not silently grant broad access.
+16. The first-admin bootstrap does not create a public self-elevation path.
+17. The sole-admin invariant is protected against concurrent multi-row mutations.
+18. Delivery OTP removal does not remove account-login OTP.
+19. Unresolved policies remain explicitly unresolved.
+20. Existing local source facts are not presented as evidence of live Supabase state.
+
+If any check fails, correct the blueprint or mark the relevant item BLOCKED. Do not conceal contradictions to obtain a positive verdict.
+
+---
+
+## 7. REQUIRED OUTPUT FORMAT
+
+Deliver the report in this exact order:
+
+1. Executive Summary.
+2. Safety Confirmation.
+3. Files Actually Inspected.
+4. Verified Baseline Inventory.
+5. Approved Decisions and Unresolved Policies.
+6. Canonical Domain Model.
+7. Table-by-Table Schema Blueprint.
+8. Inventory Equations and Reconciled Examples.
+9. Order, Dispatch, Delivery and Return Transition Matrix.
+10. RPC Transaction Contracts.
+11. Concurrency and Idempotency Design.
+12. RLS, Grants, Storage and Privacy Matrix.
+13. Sole-Admin and First-Admin Bootstrap Design.
+14. Dependency-Ordered Migration Roadmap.
+15. Adversarial Test Matrix.
+16. Cross-Workstream Consistency Audit.
+17. Blocker Register with severity, evidence, consequence, and required decision/action.
+18. Final Verdict.
+
+Use tables when they improve precision. Avoid repeating the same generic security advice in every section; instead, cross-reference specific design contracts.
+
+Include enough detail for a future engineer to implement the design without inventing missing invariants, but do not write executable migration SQL.
+
+Do not claim mathematical proof unless every assumption and invariant has been stated and the reasoning actually establishes the claim.
+
+---
+
+## 8. FINAL VERDICT RULES
+
+Choose exactly one verdict:
+
+### A. `BLOCKED — MATERIAL DESIGN GAPS REMAIN`
+
+Use this if any critical inventory, settlement, authorization, privacy, concurrency, or lifecycle contradiction remains unresolved.
+
+### B. `DESIGN BLUEPRINT COMPLETE — ELIGIBLE FOR A SEPARATE IMPLEMENTATION-AUTHORIZATION REVIEW`
+
+Use this only if the design is internally consistent, all required workstreams are complete, and all unresolved policy decisions are clearly isolated from technical decisions.
+
+This verdict does NOT authorize:
+
+- Writing migration files.
+- Modifying source files.
+- Executing SQL.
+- Running database migrations.
+- Connecting to Supabase.
+- Changing production or development databases.
+- Deploying code.
+
+Even if Verdict B is reached, implementation requires a separate explicit user authorization.
+
+## Final Instruction
+
+Be rigorous and skeptical. Treat earlier reports as evidence to verify, not as authority.
+
+If the inventory model cannot be made coherent from the available evidence, stop and identify the exact decision or missing fact needed.
+
+Do not invent certainty. Do not implement anything. Deliver the blueprint only.

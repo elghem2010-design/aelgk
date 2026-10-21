@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Remix ElajX (علاجك) - Egyptian Health-Tech Platform",
+  "description": "Secure medicine-request, pharmacy-fulfillment, and delivery platform for Egypt with dedicated portals for customers, pharmacies, couriers, and administrators.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

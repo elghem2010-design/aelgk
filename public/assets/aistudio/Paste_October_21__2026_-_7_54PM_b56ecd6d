@@ -1,0 +1,618 @@
+# ElajX (علاجك) — MASTER REPAIR & RELEASE-BLOCKER ELIMINATION
+## Phase 5.2A — Comprehensive Local Repair, Regression Testing & Final SQL Release Gate
+
+**EXECUTION MODE:** Inspect → Repair → Test → Verify → Report  
+**SCOPE:** Existing workspace and existing migration only  
+**PRODUCTION DATABASE:** STRICTLY OFF-LIMITS  
+**GOAL:** Eliminate all safely resolvable, evidenced release blockers in one controlled pass and produce a coherent candidate for final human approval.
+
+---
+
+# 0. MISSION AND NON-NEGOTIABLE RULES
+
+You are acting as the principal PostgreSQL/Supabase security engineer, backend engineer, and release engineer for ElajX, an Egyptian medicine discovery and fulfillment platform.
+
+The existing migration under review is:
+
+`supabase/migrations/20261021000001_reconcile_existing_schema.sql`
+
+The existing integrity test file is:
+
+`scripts/verify-integrity.ts`
+
+The workspace may also contain application services, database types, UI components, documentation, and scripts needed to validate compatibility. Inspect the actual workspace before deciding which files require changes.
+
+## Absolute safety rules
+
+1. NEVER connect to, inspect, mutate, migrate, reset, seed, or otherwise access a remote/live Supabase database.
+2. NEVER run `supabase db push`, `supabase migration up`, `db reset`, destructive SQL, or equivalent commands.
+3. NEVER create a new Supabase project, replace a project, or change project configuration.
+4. NEVER request, display, print, log, or copy secret values, including `SUPABASE_SERVICE_ROLE_KEY`, database passwords, access tokens, or private credentials.
+5. Do not place service-role credentials in browser code, frontend environment variables, or client-side calls.
+6. Do not create another migration merely to hide problems in the existing migration. Work on the existing candidate migration unless a genuine dependency makes that impossible.
+7. Do not disable RLS, weaken authorization, remove failing assertions, skip tests, or replace real behavior with mocks simply to obtain a passing result.
+8. Do not claim production readiness, successful live-database verification, or verified runtime security unless those claims are supported by actual appropriate evidence.
+9. Do not fabricate medicine data, regulated prices, prescription classifications, pharmacy verification, addresses, delivery fees, inventory, user roles, or business rules.
+10. Do not make unrelated redesigns, dependency upgrades, formatting sweeps, or broad refactors.
+11. Preserve unrelated existing work. Inspect the actual workspace and avoid overwriting user changes.
+12. If the workspace is not a Git repository, do not claim a verified Git diff or clean working tree. Use available file inspection and exact before/after evidence instead.
+
+**Do not stop after writing a plan.** Execute the bounded inspection, implement all safe and justified repairs, run the available checks, and return the actual evidence in the same pass.
+
+If a required business decision cannot be derived from existing code or documentation, do not invent it. Repair independent blockers, record that specific decision as unresolved, and continue with all other safe work.
+
+---
+
+# 1. ESTABLISH THE ACTUAL WORKSPACE STATE
+
+Inspect the current versions of:
+
+- `supabase/migrations/20261021000001_reconcile_existing_schema.sql`
+- `scripts/verify-integrity.ts`
+- `src/services/catalogService.ts`
+- All functions, services, types, UI consumers, and tests related to:
+  - medicine discovery and prescription classification
+  - medicine requests and request items
+  - proposed alternatives
+  - orders and order items
+  - customer addresses
+  - pharmacies and pharmacy staff
+  - courier profiles and delivery events
+  - delivery OTP and private delivery secrets
+  - user roles, admin authorization, and audit logs
+- Relevant existing migration files and documentation needed to understand legacy compatibility.
+
+Use the actual current file contents, not prior AI reports, remembered snippets, assumed line numbers, or fabricated diffs.
+
+Build an internal dependency map showing which tables, functions, triggers, policies, and application callers depend on each other.
+
+Do not spend the pass generating another broad audit report. Inspect only as deeply as necessary to make the candidate coherent, secure, and testable.
+
+---
+
+# 2. DATABASE COMPATIBILITY AND DATA INTEGRITY
+
+Inspect every statement in the candidate migration that modifies or relies on pre-existing tables.
+
+## 2.1 Existing table and column compatibility
+
+Identify every use of:
+
+- `CREATE TABLE IF NOT EXISTS`
+- `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+- `ALTER COLUMN ... SET/DROP DEFAULT`
+- `ALTER COLUMN ... SET/DROP NOT NULL`
+- type-dependent functions and constraints
+- indexes, triggers, enum types, foreign keys, and policies
+
+Do not assume that a column with the expected name has the expected type, nullability, default, or constraint.
+
+Where a safe compatibility check is possible locally, implement it so incompatible existing structures fail clearly rather than silently producing a broken schema.
+
+Do not blindly change existing types or constraints if that could rewrite or invalidate existing data. Report the exact compatibility requirement when safe automatic reconciliation cannot be established.
+
+Check enum-existence guards against schema collisions. Do not rely on `typname` alone when the intended schema is `public`.
+
+## 2.2 Eliminate fabricated legacy defaults
+
+Inspect additive defaults that may assign unverified facts to existing records, including but not limited to:
+
+- governorates and districts
+- courier vehicle types, zones, and availability
+- pharmacy verification and operational status
+- order subtotal, delivery fee, total, and status
+- inventory and commercial values
+- prescription classifications
+- timestamps or other fields whose values carry business meaning
+
+A default that is reasonable for a newly created row is not automatically truthful for every legacy row.
+
+Distinguish carefully between:
+- a legitimate default for a new record;
+- a safe nullable value for an existing record;
+- an unknown business fact that must remain unknown.
+
+Remove or adjust only the defaults that create unsupported facts. Preserve valid existing data and required application invariants. Do not mass-update records or invent replacement values.
+
+## 2.3 Medicine catalog and prescription safety
+
+Verify that:
+
+- `alternative_price` is never represented as an authoritative regulated price.
+- Unknown prices remain `NULL`/unknown, not zero.
+- Only an authoritative source may populate `max_regulated_price_egp`.
+- Legacy medicine records are not marked verified without evidence.
+- Unknown prescription classification fails closed wherever the application must decide whether a prescription is required.
+- Database defaults, seed queries, application parsing, TypeScript types, and UI rendering agree on unknown values.
+- Existing valid explicit classifications are not overwritten by guessed values.
+- Seed behavior is deterministic, idempotent, and non-destructive.
+
+Pay particular attention to `prescription_required` and `requires_prescription`: verify their distinct meanings and mappings instead of assuming they are interchangeable.
+
+Do not fabricate data to make catalog cards look complete.
+
+---
+
+# 3. SECURITY DEFINER FUNCTIONS AND AUTHORIZATION
+
+Review every `SECURITY DEFINER` function in the candidate migration, not just the functions listed in previous reports.
+
+For each function, verify:
+
+1. A fixed, appropriate `search_path`, with `pg_temp` last.
+2. Correct schema qualification for sensitive objects.
+3. Narrow `EXECUTE` permissions, including explicit revocation from `PUBLIC` where appropriate.
+4. Grants only to the intended database roles.
+5. Correct use of `auth.uid()` and the actual caller identity.
+6. No reliance on client-supplied role names, pharmacy IDs, courier IDs, or ownership claims without database-side verification.
+7. No privilege escalation through helper functions.
+8. No self-appointment as admin, pharmacy manager, verified courier, or another privileged role.
+9. No unauthorized cross-customer or cross-pharmacy access.
+10. Audit records that accurately represent the actor and action.
+
+Inspect `is_admin()`, `get_user_role()`, `is_pharmacy_staff()`, `is_pharmacy_manager()`, `get_courier_id()`, and any other authorization helpers.
+
+Do not assume that checking a JWT claim or `session_user` alone proves the intended user authorization. Explain what is actually validated.
+
+Check that helper functions do not introduce RLS recursion. If a `SECURITY DEFINER` helper is necessary, constrain its purpose and permissions. Do not use a broadly privileged helper as a shortcut around RLS.
+
+---
+
+# 4. RLS POLICY COMPLETENESS AND LEGACY POLICY INTERACTIONS
+
+Inspect every policy created or replaced by the candidate migration and identify the effective intended permissions for each sensitive table.
+
+At minimum, examine:
+
+- `profiles`
+- `user_roles`
+- `customer_addresses`
+- `pharmacies`
+- `pharmacy_staff`
+- `courier_profiles`
+- `medicines`
+- `pharmacies_stock`
+- `medicine_catalog`
+- `medicine_requests`
+- `request_items`
+- `proposed_alternatives`
+- `orders`
+- `order_items`
+- `delivery_events`
+- `audit_logs`
+- private delivery-secret storage and any related exposed objects
+
+## Required policy analysis
+
+- Distinguish `PERMISSIVE` and `RESTRICTIVE` policies.
+- Account for PostgreSQL's policy-combination semantics.
+- Identify legacy or custom-named policies that could remain active.
+- Never assume dropping a known policy name removes all permissive access.
+- Do not blindly drop unknown existing policies.
+- Document which permissions depend on existing dashboard-created policies or live schema facts that cannot be inspected under the no-network rule.
+- Ensure sensitive tables cannot be directly written by clients when mutations are intended to occur only through authorized RPCs.
+- Ensure the required application flows still have a legitimate permitted execution path.
+
+Review specifically the write paths for `orders`, `order_items`, `delivery_events`, `medicine_requests`, `request_items`, and `proposed_alternatives`.
+
+Do not add `AS RESTRICTIVE ... WITH CHECK (false)` to a table without establishing whether that would block legitimate required writes, including writes performed by privileged functions under the actual database security model.
+
+If a restrictive policy is appropriate, explain which actors and execution paths it blocks and how the intended operation remains possible.
+
+For `courier_profiles`, determine whether exposing the entire row exposes `national_id_number` or other sensitive personal information. If so, implement the smallest safe solution consistent with the existing application contract. Do not reveal private identity documents or identifiers through public read policies.
+
+If effective permissions depend on custom legacy policies, mark that as a specific deployment blocker requiring an authorized read-only policy inventory before deployment. Do not pretend the local migration alone proves the final remote policy set.
+
+---
+
+# 5. REQUEST AND ALTERNATIVE LIFECYCLE — REQUIRED REPAIR
+
+Inspect the complete current definitions of:
+
+- `start_pharmacy_review()`
+- `confirm_pharmacy_availability()`
+- `respond_to_alternative()`
+- `expire_proposed_alternative()`
+- `create_order_from_accepted_request()`
+
+Also inspect all related triggers, constraints, status enums, callers, and tests.
+
+## 5.1 `respond_to_alternative()`
+
+Fix all verified lifecycle and authorization defects.
+
+Required invariants:
+
+- The alternative exists and belongs to the intended request.
+- The request and alternative are locked in a consistent, race-safe order.
+- The caller is authorized for the request.
+- The alternative is still pending and has not expired.
+- The request's current state permits the response.
+- A cancelled or converted request cannot be resurrected by accepting an old alternative.
+- Duplicate or concurrent responses cannot create inconsistent states.
+- The function cannot modify a different request through mismatched IDs.
+- The entire request is not marked `availability_confirmed` until every required item meets the actual documented readiness criteria.
+- A decline must not automatically cancel the entire request unless existing business documentation explicitly requires that behavior.
+
+Determine whether a request can contain multiple items and multiple alternatives. Verify how accepted alternatives interact with original item availability, alternative versions, and request conversion.
+
+Do not invent whether a declined alternative cancels the request, returns it to pharmacy review, or allows another alternative. If documentation does not decide this, identify the exact decision and keep that transition blocked.
+
+## 5.2 `expire_proposed_alternative()`
+
+Establish a clear distinction between:
+
+- a customer action on their own request;
+- a trusted system operation that expires offers;
+- an authorized administrative action, if already supported by the documented role model.
+
+An authenticated user must not gain system-wide expiration privileges merely because they can invoke the RPC.
+
+If a customer-facing expiry operation is supported, validate ownership and permitted states. If expiry is a system job, use only an existing documented trusted execution path. Do not invent a scheduler or expose privileged credentials to the client.
+
+Ensure that an expiration update can commit successfully. Never rely on an update followed by an exception in the same transaction when the desired effect is to persist the update.
+
+Verify execution grants and auditing.
+
+## 5.3 `confirm_pharmacy_availability()`
+
+Check for:
+
+- authorized and appropriately verified pharmacy actors;
+- valid request state and assigned pharmacy;
+- non-empty request items;
+- complete and unambiguous item pricing/availability input;
+- rejection of unknown, duplicate, missing, or unexpected item IDs as appropriate;
+- valid non-negative delivery fee according to documented rules;
+- accurate item-level updates;
+- no premature request-level confirmation;
+- transactional consistency and audit accuracy.
+
+Do not invent prices or assume a price is authoritative because the client submitted it.
+
+## 5.4 `start_pharmacy_review()`
+
+Verify the pharmacy is eligible to act on the request under the actual business rules, including relevant verification and active-status requirements if documented.
+
+Ensure the request cannot be claimed or transitioned by an unrelated pharmacy, and that the resulting audit event accurately represents the actor.
+
+## 5.5 Order conversion
+
+Verify `create_order_from_accepted_request()` end to end.
+
+Required invariants:
+
+- authorized customer or explicitly permitted administrative actor;
+- correct request lifecycle state;
+- no duplicate order for the same request, including concurrency;
+- at least one valid request item;
+- all required items resolved to valid available catalog entries or valid accepted alternatives;
+- positive, valid item prices and quantities under the documented rules;
+- delivery fee explicitly confirmed and valid;
+- address exists and belongs to the requesting customer;
+- no synthetic default address;
+- order totals are calculated server-side;
+- alternative selection is unambiguous and tied to the correct request item;
+- no alternative can be used if it is declined, expired, superseded, or belongs to a different request;
+- order, order items, request state, delivery secret, and audit event remain transactionally consistent;
+- OTP material is not exposed to unauthorized callers, logs, audit metadata, or client-readable tables;
+- no duplicate order or duplicate OTP is produced by concurrent calls.
+
+Inspect the actual constraints and types before adding concurrency controls. If uniqueness constraints or locking patterns are needed, preserve existing data and avoid introducing unsafe destructive changes.
+
+---
+
+# 6. ORDER STATUS, COURIER EVENTS, AND OTP
+
+Inspect and correct all related functions and policies, including:
+
+- `assign_courier_to_order()`
+- `transition_order_status()`
+- `record_courier_delivery_milestone()`
+- `verify_delivery_otp()`
+- all relevant delivery-event policies and private secret access controls.
+
+## 6.1 Status transition matrix
+
+Build a matrix directly from the existing documented business rules.
+
+For each transition, establish:
+- current status;
+- next status;
+- allowed actor;
+- ownership or assignment checks;
+- required validations;
+- audit action;
+- forbidden transitions.
+
+Ensure that customers cannot modify arbitrary order statuses, pharmacies cannot act on unrelated orders, couriers cannot manipulate unassigned orders, and administrative powers are explicit rather than accidental.
+
+No actor may mark an order delivered without the intended successful OTP verification path.
+
+Prevent cancellation after delivery or after the point where the documented workflow forbids it. Resolve the previously identified pharmacy-cancellation ambiguity using existing documentation; if none exists, preserve the uncertainty rather than inventing policy.
+
+## 6.2 Delivery event integrity
+
+Ensure direct client writes cannot forge assignment or successful-delivery events.
+
+Validate that each milestone:
+- belongs to the correct order;
+- is recorded by the assigned courier or explicitly permitted actor;
+- is valid for the order's current status;
+- cannot create impossible or contradictory sequences;
+- is audited with the correct actor.
+
+Do not block legitimate RPC-driven writes by accidentally making their required execution path impossible.
+
+## 6.3 OTP security
+
+Verify:
+- cryptographically secure generation;
+- uniform code selection without modulo bias;
+- safe hash/salt handling;
+- expiration checks;
+- attempt limits and replay protection;
+- transactionally consistent order completion and secret consumption;
+- correct courier assignment checks;
+- no unauthorized retrieval of the plaintext OTP;
+- consistent timestamp/time-zone comparisons;
+- safe failure behavior.
+
+Check whether failed or expired attempts need documented handling and avoid exceptions that unintentionally roll back security counters or audit records.
+
+Do not change the delivery protocol without explaining why it is required.
+
+---
+
+# 7. ADDRESS COMPATIBILITY AND DATA CONSISTENCY
+
+Inspect the legacy address schema and all mappings among:
+
+- `addresses`
+- `customer_addresses`
+- `medicine_requests.address_id`
+- `medicine_requests.delivery_address_id`
+- `orders.delivery_address_id`
+- `orders.delivery_address_snapshot`
+
+Do not assume IDs from two different address tables refer to the same entity.
+
+Remove or repair bidirectional synchronization that can create ambiguous ownership or overwrite valid values unless its correctness is established.
+
+Do not synthesize addresses. A missing or foreign address must fail safely.
+
+Check trigger order, recursion, duplicate triggers, foreign keys, and compatibility with the actual columns used by the application.
+
+If the existing live schema must be inspected to prove compatibility, do not access it. Report the exact read-only evidence required for a later authorized human review.
+
+---
+
+# 8. CATALOG APPLICATION AND UI CONSISTENCY
+
+Inspect the real catalog service and all consumers.
+
+Ensure:
+- unknown regulated prices stay unknown;
+- `alternative_price` is never used as a substitute for an authoritative regulated price;
+- invalid, null, empty, non-finite, or non-positive values do not become fabricated commercial facts;
+- prescription classification is conservative when unknown;
+- nullable values are represented correctly in TypeScript types;
+- UI labels distinguish unknown information from a confirmed value;
+- the application does not present development fixtures as real, verified stock, prices, pharmacies, or availability;
+- any development fallback is explicitly identified as development-only and cannot silently masquerade as live production data.
+
+Preserve the current intended core scope: medicine discovery and trustworthy availability information. Do not add pharmacy-directory, cart, ordering, or delivery UI scope that has not been approved for this website release.
+
+---
+
+# 9. TRIGGERS, AUDIT LOGGING, AND FUNCTION EXECUTION
+
+Inspect all trigger definitions and audit helpers for:
+
+- duplicate trigger creation;
+- unsafe `DROP TRIGGER` operations;
+- recursion;
+- inconsistent old/new field synchronization;
+- missing audit records for privileged transitions;
+- incorrect actor roles;
+- client ability to forge audit records;
+- security-definer grant leaks;
+- audit logging that can expose sensitive data.
+
+Keep audit metadata minimal. Do not record OTP plaintext, credentials, national identifiers, or unnecessary personal information.
+
+Ensure function-level revocations and grants match the intended execution model. Do not assume revoking `PUBLIC` alone settles all inherited or explicitly granted privileges.
+
+---
+
+# 10. IMPLEMENTATION RULES
+
+After inspection, implement all verified, safely resolvable release-blocker fixes in the existing workspace during this same pass.
+
+Prefer:
+- small, targeted edits;
+- explicit validation;
+- safe transactional behavior;
+- clear constraints;
+- idempotent migration logic;
+- regression tests for each discovered defect;
+- preserving legitimate existing records and application contracts.
+
+Do not:
+- create fake seed data;
+- silently overwrite existing records;
+- drop unknown legacy policies;
+- make broad schema changes without compatibility evidence;
+- weaken RLS to make an RPC work;
+- mark unknown records verified;
+- substitute local mocks for missing production functionality;
+- hide unresolved decisions behind permissive defaults.
+
+If one issue depends on an unresolved business rule, isolate that issue and continue repairing unrelated defects.
+
+If a blocker cannot be fixed safely without live-schema evidence, leave the relevant migration unapplied and document the exact missing evidence and the minimal read-only query a human can run later.
+
+---
+
+# 11. REGRESSION TESTING
+
+Update the existing test suite. Add focused tests for every fixed invariant and every previously reported blocker.
+
+At minimum, cover:
+
+### Schema and catalog
+- schema/type compatibility guards;
+- no fabricated defaults for existing records;
+- no alternative-price-to-regulated-price mapping;
+- null/unknown regulated prices;
+- unknown prescription classification fails closed;
+- unverified medicine records remain unverified.
+
+### Authorization and RLS
+- unauthorized cross-customer access;
+- unauthorized cross-pharmacy access;
+- courier assignment restrictions;
+- client order/order-item writes blocked;
+- forged delivery events blocked;
+- admin and helper authorization edge cases;
+- legacy permissive policy interactions where testable.
+
+### Request lifecycle
+- cancelled and converted requests cannot be resurrected;
+- invalid states cannot accept or decline alternatives;
+- accepted alternatives must belong to the correct request/item;
+- unresolved request items prevent premature confirmation;
+- expiration ownership and trusted-system authorization;
+- concurrent/duplicate responses and order conversions;
+- address ownership and missing-address failures.
+
+### Order and delivery
+- duplicate order prevention;
+- totals and item pricing calculated server-side;
+- invalid transition rejection;
+- valid transition acceptance;
+- no delivery completion without valid OTP;
+- OTP replay, expiration, and attempt-limit protections;
+- delivery event authorization and sequence consistency.
+
+Use the existing test infrastructure. Do not delete, weaken, or bypass existing assertions.
+
+Clearly distinguish:
+- static source-code assertions;
+- in-memory simulations;
+- actual application unit tests;
+- actual PostgreSQL integration tests.
+
+A static regex test is not a PostgreSQL runtime security test. If no disposable local PostgreSQL environment exists, do not pretend database behavior was tested at runtime.
+
+If the workspace already has a safe local test database, use only that disposable local environment, confirm the target before destructive test setup, and never point tests at a remote Supabase project.
+
+---
+
+# 12. REQUIRED VERIFICATION COMMANDS
+
+Run the checks that exist in the workspace, using their actual package scripts:
+
+- `npm run test:integrity`
+- `npm run lint`
+- `npm run build`
+- existing applet compilation check, if available
+- existing safe local PostgreSQL tests, if available and demonstrably isolated
+
+Inspect the `package.json` scripts before describing what a command does.
+
+For each command, report:
+- exact command;
+- whether it ran;
+- exit status;
+- actual pass/fail counts if available;
+- important warnings;
+- whether the result is static, simulated, or runtime evidence.
+
+Do not report success based on a previous run or an AI-generated claim. Run the available command in the current workspace and report the actual result.
+
+If the command cannot run, explain the concrete reason. Do not fabricate an exit status.
+
+---
+
+# 13. FINAL EVIDENCE EXTRACTION
+
+The final response must contain enough actual evidence to verify the repair without asking for another generic audit.
+
+Provide:
+
+## A. Exact files changed
+List every modified file and why it changed. If Git is unavailable, state that a Git diff could not be produced.
+
+## B. Blocker resolution matrix
+For every issue identified in this pass, label it:
+- FIXED — supported by exact code and test evidence;
+- UNRESOLVED — exact missing decision or dependency;
+- NOT APPLICABLE — with a concrete reason.
+
+Do not mark an item fixed merely because a comment or test name mentions it.
+
+## C. Actual critical definitions
+Print the complete current function definitions, with no `...`, omitted branches, pseudocode, or summaries, for all functions modified in this pass and all critical functions needed to establish the corrected flow, including:
+
+- `respond_to_alternative()`
+- `expire_proposed_alternative()`
+- `confirm_pharmacy_availability()`
+- `create_order_from_accepted_request()`
+- `transition_order_status()`
+- `record_courier_delivery_milestone()`
+- `verify_delivery_otp()`
+
+Include relevant trigger definitions, policy definitions, and function `GRANT`/`REVOKE` statements that changed or are essential to prove the repair.
+
+If output limits prevent printing every definition in one response, save the complete evidence in a clearly named local report file and provide the exact report path and a concise index. Do not claim a file exists unless it was actually created.
+
+## D. RLS matrix
+For every relevant table, list:
+- existing policy name;
+- command;
+- policy permissiveness;
+- role scope;
+- `USING`;
+- `WITH CHECK`;
+- intended legitimate write path;
+- known legacy-policy dependency;
+- unresolved deployment requirement.
+
+Do not claim this is the effective live policy set; it is the candidate migration's declared policy set unless a separate authorized live inventory is later supplied.
+
+## E. Test evidence
+List actual commands and results, test categories, limitations, and any missing runtime integration coverage.
+
+## F. Deployment blockers
+List only specific unresolved issues that genuinely prevent safe application. For each one, state the minimal evidence or business decision needed to resolve it.
+
+## G. Remote safety confirmation
+State whether any remote database was accessed, queried, or modified. The expected answer is NO.
+
+Confirm that no migration was applied and no secrets were exposed.
+
+## H. Final verdict
+Choose exactly one:
+
+- `BLOCKED — CRITICAL SECURITY OR DATA-INTEGRITY DEFECTS REMAIN`
+- `BLOCKED — BUSINESS RULE OR LIVE-SCHEMA COMPATIBILITY UNRESOLVED`
+- `BLOCKED — TESTS FAILED`
+- `BLOCKED — EVIDENCE INCOMPLETE`
+- `READY FOR FINAL HUMAN SQL REVIEW`
+
+Use `READY FOR FINAL HUMAN SQL REVIEW` only if the candidate's known code-level blockers have been fixed, the available tests actually pass, the required evidence is complete, and all remaining live-schema dependencies are explicitly identified rather than hidden.
+
+This verdict does NOT authorize applying the migration to production.
+
+---
+
+# FINAL EXECUTION DIRECTIVE
+
+Start now by inspecting the actual current workspace and relevant files.
+
+Do not return only a plan. Make the safe, scoped repairs; run the available tests; extract the real code and policy evidence; and produce one consolidated report.
+
+Do not start another broad audit cycle after this pass. If a genuinely unresolved business rule or live-schema dependency remains, identify it precisely and stop at that boundary.
+
+**The objective is a coherent, testable migration candidate and a defensible release decision — not a positive-looking report.**

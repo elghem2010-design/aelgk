@@ -1,0 +1,537 @@
+# ElajX (علاجك) — Phase 4H.11
+## INDEPENDENT ADVERSARIAL DESIGN AUDIT — INVENTORY DOMAIN COMPLETENESS, POSTGRESQL IDEMPOTENCY ARBITRATION, DOUBLE-ENTRY COD CLOSURE & LAST-ADMIN SAFETY
+
+### 1. Mission and governing decision
+
+Perform an independent, adversarial, read-only engineering audit of the Phase 4H.10 report.
+
+Do not rewrite Phase 4H.10 as a polished document. Challenge its claims, identify logical contradictions, and establish the narrowest guarantees that can actually be supported by the inspected local source and explicit assumptions.
+
+The primary question is not whether Phase 4H.10 sounds complete. The question is whether each claimed invariant follows logically from its definitions and whether each proposed PostgreSQL protocol is sufficiently specified to be implementable without relying on undocumented behavior.
+
+The prior report is a claim to evaluate, not an authoritative source of truth.
+
+Approved product decision:
+- Option A remains in force.
+- Remove recipient delivery OTP from delivery-completion authorization.
+- Preserve account registration, login, and authentication OTP behavior.
+- Do not reintroduce recipient delivery OTP.
+- Do not treat the OTP removal as implemented or verified.
+
+Product policies POL-01 through POL-05 remain unapproved. Do not invent policy values, commercial allocations, regulatory retention periods, or stakeholder approvals.
+
+### 2. ABSOLUTE READ-ONLY SAFETY CONTRACT
+
+This phase is analysis and documentation only.
+
+Mandatory prohibitions:
+1. Create, modify, rename, format, or delete zero repository files.
+2. Execute or generate executable SQL, DDL, DML, migrations, database scripts, or runnable database snippets.
+3. Connect to PostgreSQL, Supabase, PostgREST, Storage, authentication services, or any remote endpoint.
+4. Make network requests.
+5. Inspect, print, infer, or expose secrets, tokens, API keys, environment values, or credentials.
+6. Run tests, builds, scripts, migrations, benchmarks, or deployments.
+7. Modify application code, dependencies, schemas, policies, database configuration, or deployment configuration.
+8. Claim that runtime behavior, remote infrastructure, production telemetry, RLS, Storage privacy, or concurrency properties have been verified when they have not.
+9. Treat a proposed design, test specification, or mathematical example as evidence of implementation.
+10. Begin an implementation phase or authorize another agent to make changes.
+
+If the existing workspace cannot be inspected without violating these constraints, state the limitation and stop the affected inspection. Do not substitute assumptions for evidence.
+
+The deliverable may contain plain prose, visible ASCII equations, tables, state descriptions, and non-executable conceptual pseudocode. Do not include executable SQL or database command blocks.
+
+### 3. EVIDENCE AND ACCEPTANCE RULES
+
+Classify every substantive conclusion as one of:
+
+- SOURCE FACT — directly observed in a local source file with an exact path and line range.
+- PRIOR-REPORT CLAIM — asserted in Phase 4H.10 or an earlier report but not independently established.
+- DERIVED CONCLUSION — follows from cited facts and explicit assumptions.
+- DESIGN PROPOSAL — a candidate future design, not implemented.
+- UNKNOWN — evidence is insufficient.
+- NOT EXECUTED — runtime verification has not occurred.
+- BLOCKED BY POLICY — a required product, commercial, operational, or legal decision remains unapproved.
+
+Inspect relevant local source before making source-specific claims. Do not fabricate paths, line ranges, constraints, function signatures, or existing schema objects.
+
+When local inspection is unavailable, label the result UNKNOWN instead of inventing evidence.
+
+Do not award CLOSED AT DESIGN LEVEL merely because a report contains a diagram, an equation, or a confident assertion. Every closure claim must include:
+- The precise invariant.
+- The assumptions required.
+- A proof or a complete logical argument.
+- Counterexamples considered.
+- Remaining limitations.
+- A clearly stated acceptance status.
+
+Use OPEN, UNPROVEN, BLOCKED BY POLICY, or DESIGN PROPOSAL when the burden of proof has not been met.
+
+### 4. DEF-A — ADVERSARIAL INVENTORY MODEL AUDIT
+
+Audit the definitions and equations in Phase 4H.10, especially:
+
+- opening_units
+- supplier_receipts
+- positive_adjustments
+- negative_adjustments
+- supplier_returns
+- sellable_units
+- reserved_units
+- courier_custody_units
+- returned_uninspected_units
+- quarantined_units
+- delivered_units
+- destroyed_units
+- shelf_physical_units
+- pharmacy_facility_units
+- cumulative_inflow
+- cumulative_outflow
+
+#### A1. Test the model's domain completeness
+
+Determine whether every physical unit must occupy exactly one explicitly represented state at every relevant time.
+
+Specifically investigate:
+- Expired stock still physically present on a pharmacy shelf.
+- Stock held for quality inspection or recall before its final classification.
+- Stock that has been picked and packed but not yet handed to the courier.
+- A reservation cancellation before pickup.
+- A reservation cancellation after stock has been picked or packed.
+- Partial pickup or partial delivery of a multi-unit order.
+- A failed delivery with the courier retaining physical custody.
+- Returned goods awaiting pharmacist inspection.
+- Intact returns approved for restocking.
+- Damaged or seal-broken returns sent to quarantine.
+- Quarantined goods awaiting disposal.
+- Supplier returns and supervised destruction.
+- Inventory losses discovered during a physical count.
+- A positive or negative audit adjustment without a corresponding physical movement.
+
+Do not automatically add every listed condition as a new production table or column. First establish which conditions require distinct accounting domains, which can be modeled as attributes, and which require separately recorded events.
+
+#### A2. Distinguish physical movements from accounting corrections
+
+Phase 4H.10 includes negative_adjustments in cumulative_outflow.
+
+Determine whether this makes the universal conservation equation ambiguous or incomplete.
+
+Explicitly distinguish:
+- A physical transfer between domains.
+- A physical exit from the tracked inventory boundary.
+- A correction of a previously recorded balance.
+- A discrepancy discovered during counting.
+- An approved write-off of a quantity that cannot be physically located.
+
+Explain how each event is represented without silently subtracting units from one equation while leaving the corresponding domain or event unexplained.
+
+A correction must not be presented as a physical movement unless the design explicitly supports that interpretation.
+
+#### A3. Reconstruct the equations from definitions
+
+For every equation, define the inventory boundary, units, opening-balance semantics, and time boundary.
+
+Test the logical relationship among:
+- Lifetime conservation.
+- Domain-level balance reconstruction.
+- Shelf physical stock.
+- Sellable availability.
+- Reserved stock.
+- Expired or otherwise unsellable stock.
+- Quarantined stock.
+- Physical custody outside the pharmacy.
+- Terminal delivered and destroyed quantities.
+
+Determine whether a movement-ledger reconstruction and an aggregate lifetime conservation equation independently agree, or whether they merely repeat the same unverified assumptions.
+
+Check whether all equations remain valid when there are multiple lots, partial quantities, reversals, adjustments, and transactions that fail and roll back.
+
+All quantities must be non-negative integers unless an explicitly justified unit model says otherwise.
+
+#### A4. Rework the numerical example
+
+Reassess the ten-unit lot example from Phase 4H.10.
+
+Provide a complete, readable state table for:
+1. Opening state.
+2. Supplier receipt of ten units.
+3. Reservation of three units.
+4. Courier pickup.
+5. Failed delivery.
+6. Return handover.
+7. Intact-return restocking branch.
+8. Damaged-return quarantine branch.
+9. Disposal after the damaged-return branch.
+
+Show the mutually exclusive branches clearly. Do not sum both branch outcomes as if both occurred.
+
+For every row, show:
+- Sellable stock.
+- Reserved stock.
+- Courier custody.
+- Returned-uninspected stock.
+- Quarantined stock.
+- Delivered quantity.
+- Destroyed quantity.
+- Any additional domain needed by the corrected model.
+- Cumulative external inflow.
+- Cumulative external outflow.
+- The exact conservation check.
+
+If the model requires another state to represent a physically possible condition, explain the state and include it in the example.
+
+Do not claim complete domain coverage if any physical condition remains unrepresented.
+
+DEF-A is CLOSED only if the definitions are mutually consistent and every modeled transition preserves the applicable invariants. Otherwise, identify the exact open defect.
+
+### 5. DEF-B — POSTGRESQL IDEMPOTENCY ARBITRATION AUDIT
+
+Phase 4H.10 proposes a unique-key insert, waiting on a competing transaction, replaying the committed response, or retrying after rollback.
+
+Do not assume that this sequence is implementable as described.
+
+#### B1. Resolve the unique-conflict transaction-state problem
+
+Analyze the exact distinction between:
+- A plain INSERT that encounters a unique violation.
+- Conflict handling that does not leave the transaction aborted.
+- A competing transaction that has not yet committed its candidate row.
+- A competing transaction that commits.
+- A competing transaction that rolls back.
+- A transaction that encounters a conflict but cannot safely continue with its existing transaction state.
+
+Explain, conceptually and without executable SQL, which arbitration strategy is proposed and why it remains valid under each outcome.
+
+A statement such as "the second request waits, reads the committed row, or inserts if the first transaction rolls back" is not sufficient without a valid transaction-control explanation.
+
+If more than one strategy is possible, compare their failure modes and identify the chosen candidate. Do not present a design option as implemented.
+
+#### B2. Define ownership and transaction boundaries precisely
+
+Define:
+- The idempotency namespace and uniqueness scope.
+- The operation identity.
+- The first-use ownership claim.
+- When the key becomes visible to competing transactions.
+- When business mutations begin.
+- When the stored response becomes durable.
+- What happens when validation fails before the claim.
+- What happens when validation fails after the claim.
+- What happens when an internal mutation fails.
+- What happens when the process or connection fails.
+- What happens when a request loses its response after commit.
+- How a retry distinguishes a committed operation from an uncommitted or rolled-back attempt.
+
+Specify whether the design uses one database transaction for the claim, business mutations, stored response, and commit.
+
+If it does, explain how an uncommitted IN_PROGRESS row can or cannot be observed by another transaction and why no committed orphaned IN_PROGRESS state is assumed.
+
+If it does not, identify the additional recovery mechanism required. Do not silently mix single-transaction and multi-transaction protocols.
+
+#### B3. Narrow the guarantee
+
+Do not use "exactly once" as a universal guarantee.
+
+State the strongest defensible guarantee for durable business effects inside the defined transaction boundary.
+
+Explicitly separate:
+- At-most-once durable effects within that transaction.
+- Replay of a previously committed response.
+- Client retries.
+- Non-transactional external side effects.
+- Outbound notifications or other work performed outside the transaction.
+- Operations performed by another actor or under another idempotency namespace.
+
+Do not imply that a database idempotency key alone guarantees exactly-once delivery of external messages or network operations.
+
+#### B4. Define canonicalization without ambiguity
+
+Evaluate the Phase 4H.10 rules for sorting JSON keys, whitespace removal, numeric normalization, and stripping transient metadata.
+
+Specify how the canonical representation handles:
+- Missing fields versus explicit null.
+- Object-key order.
+- Array order.
+- Numeric values, decimal scale, and integer versus decimal representations.
+- Currency and monetary precision.
+- Identifiers represented as strings versus numbers.
+- Item ordering where order is business-significant or business-insignificant.
+- Duplicate item entries versus aggregated quantities.
+- Quantity normalization.
+- Destination address identifiers.
+- Medicine identifiers.
+- Explicitly locked prices or fees.
+- Unknown or unsupported fields.
+- Fields that are server-derived rather than client-controlled.
+- Changes in canonicalization rules across software versions.
+
+Do not normalize two payloads to the same hash if the business considers them different. Do not reject equivalent requests merely because irrelevant serialization details differ.
+
+State the assumed hash algorithm and explain why hash equality alone is not a substitute for validating the request's canonical business representation.
+
+#### B5. Re-evaluate concurrency scenarios
+
+Review at least these scenarios:
+1. Simultaneous first use with identical payloads.
+2. Simultaneous first use with conflicting payloads.
+3. First transaction rolls back.
+4. Client disconnects after commit.
+5. Multiple retries after rollback.
+6. Retry while the original transaction is executing.
+7. Replay of a committed response.
+8. Same key used by a different actor.
+9. Validation failure.
+10. Failure after a tentative first mutation.
+11. Canonically equivalent payloads.
+12. Business-significant payload changes.
+
+For every scenario, specify:
+- Transaction state.
+- Ownership outcome.
+- Durable mutation outcome.
+- Response outcome.
+- Whether the key remains reusable.
+- Whether a competing transaction can continue safely after arbitration.
+
+Add scenarios if a meaningful race is missing.
+
+DEF-B remains OPEN if any scenario depends on unspecified transaction behavior or if the uniqueness-conflict path cannot be explained coherently.
+
+### 6. DEF-C — COD ACCOUNTING, DOUBLE-ENTRY AND CLOSURE AUDIT
+
+Treat the Phase 4H.10 COD equations as a candidate reconciliation model, not as proof of a valid accounting ledger.
+
+#### C1. Define distinct quantities and their meaning
+
+Audit the difference among:
+- Customer obligation.
+- Cash collected from the customer.
+- Cash physically held by the courier.
+- Cash tendered by the courier.
+- Cash acknowledged by the pharmacy cashier.
+- Customer receivable.
+- Written-off customer receivable.
+- Pharmacy contractual entitlement.
+- Platform contractual entitlement.
+- Amount owed to the courier, if applicable.
+- Cash refunds, reversals, or returned payments, if applicable.
+
+Do not assume that a tendered amount has been received by the pharmacy until the applicable acknowledgment event occurs.
+
+Do not assume that a write-off represents cash collection.
+
+Do not assume that customer obligation is necessarily identical to pharmacy entitlement plus platform entitlement unless the contractual accounting model explicitly establishes that relationship.
+
+#### C2. Test the Phase 4H.10 reconciliation identity
+
+Phase 4H.10 proposes:
+
+customer_obligation = pharmacy_acknowledged_cash + tendered_unacknowledged + courier_cash_custody + customer_receivable + bad_debt_loss_allowance
+
+Determine precisely what this equation represents and whether it is a valid conservation identity, a collection-status reconciliation, or an incomplete accounting equation.
+
+Explain whether the quantities on its right-hand side are mutually exclusive, consistently measured, and complete across all states.
+
+If the equation is retained, state all required assumptions. If it is not sufficient, provide a corrected conceptual reconciliation with explicit variable definitions.
+
+Do not conceal an imbalance by relabeling a loss, receivable, or entitlement.
+
+#### C3. Reconstruct the 350 EGP example
+
+Use the same numerical assumptions:
+- Goods value: 300.00 EGP.
+- Delivery fee: 50.00 EGP.
+- Customer obligation: 350.00 EGP.
+- Cash collected: 340.00 EGP.
+- Customer shortfall: 10.00 EGP.
+- First remittance: 300.00 EGP.
+- Second remittance: 40.00 EGP.
+- Authorized write-off, if permitted: 10.00 EGP.
+
+Produce a step-by-step reconciliation for:
+1. Order confirmation.
+2. Partial collection.
+3. First cash tender.
+4. First cash acknowledgment.
+5. Second cash tender.
+6. Second cash acknowledgment.
+7. Authorized write-off.
+8. Duplicate remittance attempt.
+9. Delayed or missing acknowledgment.
+10. Acknowledgment that disagrees with the tendered amount.
+
+Show the amount in every relevant state after each event. Explicitly identify which transitions are rejected and which remain pending.
+
+#### C4. Require explicit counterpart entries
+
+Describe the conceptual debit and credit sides of each relevant financial event, including:
+- Customer obligation recognition.
+- Cash collection by the courier.
+- Courier remittance.
+- Pharmacy acknowledgment.
+- Customer receivable recognition.
+- Authorized bad-debt write-off.
+- Refund or reversal, if applicable.
+
+Do not assume that a write-off's debit and credit entries alone establish that the full order is financially settled.
+
+If the precise account mapping depends on contractual allocation or the accounting framework, state the unresolved dependency rather than inventing a chart of accounts.
+
+#### C5. Define financial closure eligibility
+
+Determine whether the proposed conditions
+
+courier_cash_custody == 0
+tendered_unacknowledged == 0
+customer_receivable == 0
+
+are sufficient for financial closure.
+
+Specifically evaluate whether closure also requires:
+- Reconciled remittances.
+- No unresolved acknowledgment discrepancies.
+- An approved treatment for written-off balances.
+- Reconciled pharmacy and platform entitlements.
+- Resolution of refunds, reversals, or disputed amounts where applicable.
+- An auditable final closure event.
+
+Do not invent POL-05 or any other commercial allocation.
+
+If pharmacy/platform entitlement allocation is unresolved, mark the corresponding closure claim OPEN or BLOCKED BY POLICY.
+
+The example may be operationally reconciled while commercial settlement remains incomplete. Keep these outcomes separate.
+
+### 7. DEF-D — LAST-ADMIN CONCURRENCY AND DELETE-PATH AUDIT
+
+Reassess the claim that the last-administrator protection is closed under PostgreSQL isolation levels.
+
+Do not assume that an advisory lock refreshes a transaction snapshot.
+
+#### D1. Establish the snapshot argument
+
+Explain conceptually:
+- When a statement snapshot is established under READ COMMITTED.
+- How a trigger that waits on an advisory transaction lock relates to the executing statement's snapshot.
+- Whether a later command executed by a trigger necessarily receives a new snapshot.
+- How REPEATABLE READ differs.
+- What conditions are necessary for a serialization failure under SERIALIZABLE.
+- Whether an advisory lock alone establishes a serialization dependency between transactions.
+- Whether a 40001 failure is guaranteed or merely possible in the described arrangement.
+
+Distinguish documented PostgreSQL semantics from assumptions about the particular trigger and command sequence.
+
+If the proposed mechanism relies on an unproven snapshot-refresh assumption, mark it OPEN. Do not invent a guarantee to preserve the earlier verdict.
+
+#### D2. Analyze all role mutation and deletion vectors
+
+Assess the relevant existing local definitions, if available:
+- Direct deletion of an administrator role.
+- Role demotion or replacement.
+- Concurrent deletion or demotion of multiple administrators.
+- Profile deletion cascading into user_roles.
+- Auth-user deletion cascading into profiles and roles.
+- Administrative RPCs and privileged alternate paths.
+- Foreign-key enforcement and trigger execution.
+- Operations that may be performed by privileged database operators.
+
+Do not treat ON DELETE RESTRICT or a profile-delete trigger as a universal defense against all alternate mutation paths.
+
+Identify the minimum conceptual invariant required: every authorized mutation path must preserve at least one valid active administrator, with a concurrency-safe enforcement mechanism and a clearly defined privileged-operator trust boundary.
+
+Do not generate implementation SQL.
+
+#### D3. Separate design confidence from runtime proof
+
+A coherent concurrency argument may justify a candidate design. It does not prove the implementation is race-free.
+
+Classify the design conclusion separately from:
+- NOT EXECUTED concurrency tests.
+- NOT EXECUTED isolation-level tests.
+- NOT EXECUTED cascade-path tests.
+- UNKNOWN remote schema and policy state.
+
+DEF-D remains OPEN / UNPROVEN until the claimed invariant follows from a valid argument over the actual relevant mutation paths.
+
+### 8. DEPENDENT CLAIMS — RECLASSIFY WITHOUT OVERCLAIMING
+
+Review these claims independently:
+
+A. Global deadlock freedom:
+Keep UNPROVEN unless every relevant lock acquisition path and implicit database lock interaction is accounted for. No runtime stress test has been executed.
+
+B. Composite allocation integrity:
+The proposed composite foreign key from allocation records to order_items requires a matching unique key on the referenced pair. Confirm whether the prerequisite is supported by the inspected baseline; otherwise label it UNKNOWN. Do not mark it implemented.
+
+C. Prescription privacy:
+A private bucket, server-side signed URL endpoint, or candidate pharmacy isolation design is not proof of effective privacy. Without actual policy and authorization evidence, classify it DESIGN PROPOSAL / NOT EXECUTED.
+
+D. Recipient delivery OTP retirement:
+Option A remains approved, but removal is not implemented merely because an expand-and-contract plan exists. Preserve account/login OTP. Invocation telemetry, source call-site removal, dependent database routine review, and any required monitoring period remain unverified unless evidence establishes otherwise.
+
+E. POL-01 through POL-05:
+Keep BLOCKED BY POLICY. Do not select policy values or represent unapproved decisions as resolved.
+
+F. Tests:
+Every proposed test remains NOT EXECUTED. A test matrix is not a test result.
+
+### 9. REQUIRED FINAL REPORT STRUCTURE
+
+Return one consolidated Phase 4H.11 report with these sections:
+
+1. Safety and evidence statement.
+2. Local source evidence actually inspected, with exact paths and line ranges where available.
+3. Phase 4H.10 claim-by-claim disposition table:
+   - Claim.
+   - Prior status.
+   - Independent finding.
+   - Evidence classification.
+   - Proof or counterexample.
+   - Corrected status.
+4. DEF-A inventory definitions, corrected equations, domain completeness analysis, and reconciled ten-unit example.
+5. DEF-B transaction arbitration, canonicalization, narrow guarantee, and concurrency scenario matrix.
+6. DEF-C accounting interpretation, corrected reconciliation, 350 EGP event history, counterpart entries, and closure criteria.
+7. DEF-D snapshot/isolation argument, mutation-path coverage, and corrected confidence level.
+8. Dependent-claim matrix for deadlocks, composite integrity, prescription privacy, OTP retirement, and policy blockers.
+9. Explicit list of unresolved assumptions and decisions.
+10. Final acceptance verdict and exact next permitted step.
+
+For every defect, use one of these statuses:
+- CLOSED AT DESIGN LEVEL — only when the stated design invariant is logically established under explicit assumptions.
+- OPEN — a contradiction, missing invariant, or underspecified protocol remains.
+- UNPROVEN — the claim lacks a sufficient proof.
+- DESIGN PROPOSAL — future architecture only.
+- BLOCKED BY POLICY — formal stakeholder or legal decision required.
+- NOT EXECUTED — runtime verification has not occurred.
+- UNKNOWN — evidence unavailable.
+
+### 10. VERDICT RULES
+
+Do not force a favorable verdict.
+
+If one critical transaction-safety or accounting-closure issue remains unresolved, do not describe the architecture as implementation-ready.
+
+Distinguish:
+- Design completeness.
+- Source-code conformity.
+- Schema readiness.
+- Runtime correctness.
+- Production verification.
+- Policy approval.
+
+These are different acceptance dimensions and must not be collapsed into one "ready" label.
+
+The final report must explicitly answer:
+1. Which Phase 4H.10 claims genuinely survive independent scrutiny?
+2. Which closure claims must be downgraded?
+3. What exact technical contradiction or missing proof prevents final design acceptance?
+4. Which issues require engineering clarification versus stakeholder approval?
+5. Is another read-only design phase required, or is a narrowly defined stakeholder decision the next step?
+
+Do not automatically recommend another phase merely to continue the phase numbering. Recommend one only if a concrete unresolved engineering question can be closed by it.
+
+### 11. FINAL SAFETY REMINDER
+
+This phase grants no implementation authorization.
+
+Do not create or modify files. Do not generate executable database statements. Do not connect to any database, service, or remote endpoint. Do not run tests or builds. Do not deploy.
+
+Finish with a concise declaration of what was actually inspected, what was not executed, what remains unproven, and what exact approval would be needed before any future implementation.
